@@ -4,7 +4,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OUTPUT_DIR="${1:-$PROJECT_ROOT/repo}"
+OUTPUT_DIR="$PROJECT_ROOT/repo"
 
 # Colors
 RED='\033[0;31m'
@@ -15,6 +15,14 @@ NC='\033[0m'
 log() { echo -e "${BLUE}[BUILD]${NC} $*"; }
 log_ok() { echo -e "${GREEN}[OK]${NC} $*"; }
 log_err() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -o|--output) OUTPUT_DIR="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
 
 # Parse dependencies.conf and build in order
 build_packages() {
