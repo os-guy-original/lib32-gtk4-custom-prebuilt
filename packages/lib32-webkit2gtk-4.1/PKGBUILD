@@ -50,6 +50,8 @@ makedepends=(
     'python'
     'ruby'
     'wayland-protocols'
+    'bubblewrap'
+    'xdg-dbus-proxy'
 )
 provides=(
     'lib32-libjavascriptcoregtk-4.1.so'
@@ -90,6 +92,7 @@ build() {
         -DENABLE_INTROSPECTION=OFF \
         -DENABLE_GAMEPAD=OFF \
         -DENABLE_WEBDRIVER=OFF \
+        -DENABLE_BUBBLEWRAP_SANDBOX=OFF \
         -DUSE_GTK4=OFF \
         -DUSE_SOUP2=OFF \
         -DUSE_LIBSECRET=OFF \
