@@ -32,6 +32,10 @@ done
 rm -f "$REPO_NAME".db "$REPO_NAME".files
 rm -f "$REPO_NAME".db.tar.gz.old "$REPO_NAME".files.tar.gz.old
 
+# Copy .tar.gz to .db and .files (pacman expects these filenames)
+cp "$REPO_NAME".db.tar.gz "$REPO_NAME".db
+cp "$REPO_NAME".files.tar.gz "$REPO_NAME".files
+
 echo ""
-ls -lh "$REPO_NAME".db.tar.gz
+ls -lh "$REPO_NAME".db "$REPO_NAME".files
 echo "SUCCESS: Database updated"

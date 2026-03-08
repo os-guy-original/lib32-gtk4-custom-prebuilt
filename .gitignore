@@ -14,6 +14,8 @@ src/
 !repo/*.pkg.tar.zst
 !repo/*.pkg.tar.xz
 !repo/*.tar.gz
+!repo/*.db
+!repo/*.files
 
 # Build metadata files
 .BUILDINFO
