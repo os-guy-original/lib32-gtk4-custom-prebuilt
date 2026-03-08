@@ -1,7 +1,7 @@
 #!/bin/bash
 # Check which packages need to be rebuilt
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 source "$SCRIPT_DIR/common.sh"
@@ -9,7 +9,6 @@ source "$SCRIPT_DIR/common.sh"
 NEEDS_BUILD=()
 ALREADY_BUILT=()
 
-# Get build order
 packages=$(get_build_order)
 
 while IFS= read -r pkgname; do

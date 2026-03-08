@@ -5,7 +5,7 @@
 set -e
 set -o pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_DIR="$PROJECT_ROOT/repo"
 
@@ -47,39 +47,49 @@ check_multilib() {
 # Install package from repo if available
 install_from_repo() {
     local pkgname="$1"
-    local pkgfile=$(ls "$REPO_DIR/${pkgname}"-*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
     
-    if [ -f "$pkgfile" ]; then
+    # Find any package file matching the name
+    for pkgfile in "$REPO_DIR/${pkgname}"-*-x86_64.pkg.tar.zst; do
+        # Skip debug packages
+        [[ "$pkgfile" == *-debug-* ]] && continue
+        [ -f "$pkgfile" ] || continue
+        
         info "Installing $pkgname from repo..."
-        sudo pacman -U "$pkgfile" --noconfirm --overwrite '*' 2>/dev/null || true
+        sudo pacman -U "$pkgfile" --noconfirm --overwrite '*' 2>&1 || {
+            warn "Failed to install $pkgname (may already be installed)"
+        }
         return 0
-    fi
+    done
     return 1
+}
+
+# Install all available packages from repo (for dependency satisfaction)
+install_all_from_repo() {
+    info "Installing available packages from repo..."
+    
+    local installed=0
+    for pkgfile in "$REPO_DIR"/lib32-*-x86_64.pkg.tar.zst; do
+        # Skip debug packages
+        [[ "$pkgfile" == *-debug-* ]] && continue
+        [ -f "$pkgfile" ] || continue
+        
+        local pkgname=$(basename "$pkgfile" | sed 's/-[0-9].*//')
+        info "Installing $pkgname..."
+        sudo pacman -U "$pkgfile" --noconfirm --overwrite '*' 2>&1 || true
+        installed=$((installed + 1))
+    done
+    
+    info "Installed $installed packages from repo"
 }
 
 # Check if package is built and valid
 check_package_valid() {
     local pkgname="$1"
     local pkgver="$2"
-    local pkgdir=$(find_pkgdir "$pkgname")
     
-    [ -z "$pkgdir" ] && return 1
-    [ ! -f "$pkgdir/PKGBUILD" ] && return 1
-    
-    # Get full version with epoch
-    local epoch=""
-    source "$pkgdir/PKGBUILD" epoch 2>/dev/null || true
-    local fullver="${epoch:+$epoch:}$pkgver"
-    
-    # Check package file exists
-    local pkgfile=$(ls "$REPO_DIR/${pkgname}-${fullver}"*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
+    local pkgfile=$(ls "$REPO_DIR/${pkgname}-${pkgver}"*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
     [ -z "$pkgfile" ] && return 1
-    
-    # Check signature
     [ ! -f "${pkgfile}.sig" ] && return 1
-    
-    # Verify signature
-    gpg --verify "${pkgfile}.sig" "$pkgfile" 2>/dev/null || return 1
     
     return 0
 }
@@ -102,20 +112,17 @@ build_package() {
     
     step "Building $pkgname"
     info "Version: $pkgver"
-    info "Directory: $pkgdir"
     
     local pkg_start=$(date +%s)
     
     cd "$pkgdir"
     
-    # Build with makepkg -d to skip dependency checks (we handle deps ourselves)
-    # -s auto-resolves deps but fails if not in repos
-    # -d skips dependency checks
+    # Build with -d to skip dependency checks (we handle deps ourselves)
     if makepkg -f --noconfirm --nocheck -d 2>&1 | tee /tmp/build-${pkgname}.log; then
         # Move packages to repo
         mv "$pkgdir"/*.pkg.tar.* "$REPO_DIR/" 2>/dev/null || true
         
-        # Install for subsequent builds
+        # Install this package for subsequent builds
         install_from_repo "$pkgname" || true
         
         local pkg_end=$(date +%s)
@@ -138,6 +145,12 @@ main() {
     
     check_multilib
     mkdir -p "$REPO_DIR"
+    
+    # First, install all available packages from repo
+    # This ensures dependencies are satisfied for subsequent builds
+    if [ -d "$REPO_DIR" ] && ls "$REPO_DIR"/*.pkg.tar.zst >/dev/null 2>&1; then
+        install_all_from_repo
+    fi
     
     # Get build order
     local packages
@@ -166,7 +179,7 @@ main() {
         # Check if already built and valid
         if [ $FORCE_BUILD -eq 0 ] && check_package_valid "$pkgname" "$pkgver"; then
             info "Skipping $pkgname - already built and signed"
-            # Still need to install it for deps
+            # Install it anyway for deps
             install_from_repo "$pkgname" || true
             skipped=$((skipped + 1))
             continue

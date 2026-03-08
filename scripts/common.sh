@@ -1,7 +1,7 @@
 #!/bin/bash
 # Common functions for lib32-prebuilts
 
-# Use PWD when sourced, or script dir when executed directly
+# Use BASH_SOURCE for reliable script location
 if [[ -n "${BASH_SOURCE[0]}" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 else
@@ -103,16 +103,9 @@ check_package_valid() {
     local pkgname="$1"
     local pkgver="$2"
     
-    # Use ls with full path
     local pkgfile=$(ls "$REPO_DIR/${pkgname}-${pkgver}"*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
-    
-    if [ -z "$pkgfile" ]; then
-        return 1
-    fi
-    
-    if [ ! -f "${pkgfile}.sig" ]; then
-        return 1
-    fi
+    [ -z "$pkgfile" ] && return 1
+    [ ! -f "${pkgfile}.sig" ] && return 1
     
     return 0
 }

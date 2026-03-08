@@ -12,7 +12,6 @@ license=('LGPL-2.1-or-later')
 depends=(
     'lib32-atk'
     'lib32-cairo'
-    'lib32-enchant'
     'lib32-fontconfig'
     'lib32-freetype2'
     'lib32-gdk-pixbuf2'
@@ -91,13 +90,17 @@ build() {
         -DENABLE_DOCUMENTATION=OFF \
         -DENABLE_MINIBROWSER=OFF \
         -DENABLE_SPEECH_SYNTHESIS=OFF \
-        -DUSE_GTK4=OFF \
-        -DUSE_SOUP2=OFF \
         -DENABLE_INTROSPECTION=OFF \
         -DENABLE_GAMEPAD=OFF \
         -DENABLE_WEBDRIVER=OFF \
+        -DUSE_GTK4=OFF \
+        -DUSE_SOUP2=OFF \
         -DUSE_LIBSECRET=OFF \
-        -DUSE_LIBBACKTRACE=OFF
+        -DUSE_ENCHANT=OFF \
+        -DUSE_LIBBACKTRACE=OFF \
+        -DUSE_WOFF2=OFF \
+        -DUSE_OPENJPEG=OFF \
+        -DUSE_LIBMANETTE=OFF
     
     cmake --build build
 }

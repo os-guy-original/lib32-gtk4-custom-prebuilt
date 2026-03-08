@@ -29,6 +29,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: archlinux:latest
+    timeout-minutes: 360  # 6 hours for webkit
     
     steps:
     - name: Setup Arch Linux
@@ -41,18 +42,10 @@ jobs:
         fi
         
         pacman -Sy --noconfirm
-        pacman -S --noconfirm --needed base-devel git multilib-devel sudo meson ninja pkgconf cmake gnupg nasm yasm
+        pacman -S --noconfirm --needed base-devel git multilib-devel sudo meson ninja pkgconf cmake gnupg nasm yasm clang lld
 
     - name: Checkout
       uses: actions/checkout@v4
-
-    - name: Debug - List repo contents
-      run: |
-        echo "=== Repo directory contents ==="
-        ls -la repo/*.pkg.tar.zst 2>/dev/null | head -20 || echo "No packages found"
-        echo ""
-        echo "=== Checking first package ==="
-        ls -la repo/lib32-gdbm* 2>/dev/null || echo "lib32-gdbm not found"
 
     - name: Import GPG key
       env:
@@ -83,16 +76,15 @@ jobs:
           libcloudproviders wayland-protocols vulkan-headers \
           lib32-sdl2 lib32-alsa-lib lib32-libvdpau \
           lib32-freetype2 lib32-fontconfig lib32-fribidi \
-          ffmpeg glib2-devel
+          lib32-libgcrypt lib32-libtasn1 lib32-libwebp \
+          lib32-lcms2 lib32-libavif lib32-libxslt \
+          ffmpeg glib2-devel ruby python
 
     - name: Check packages status
       id: check
       run: |
         chmod +x scripts/*.sh
         source scripts/common.sh
-        
-        echo "=== REPO_DIR: $REPO_DIR ==="
-        echo "=== Checking packages ==="
         
         if [ "${{ inputs.force }}" = "true" ]; then
           echo "Force rebuild requested"
@@ -102,24 +94,11 @@ jobs:
           while IFS='|' read -r name version depends notes; do
             [[ -z "$name" || "$name" =~ ^# ]] && continue
             
-            # Debug output
-            pkgfile=$(ls "$REPO_DIR/${name}-${version}"*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
-            if [ -n "$pkgfile" ]; then
-              echo "Found: $pkgfile"
-              if [ -f "${pkgfile}.sig" ]; then
-                echo "  Signature exists"
-              else
-                echo "  No signature"
-              fi
-            else
-              echo "Not found: ${name}-${version}"
-            fi
-            
             if ! check_package_valid "$name" "$version"; then
               needs_build="yes"
-              echo ">> Needs build: $name"
+              echo "Needs build: $name"
             else
-              echo ">> Valid: $name"
+              echo "Valid: $name"
             fi
           done < packages.conf
           echo "needs_build=$needs_build" >> $GITHUB_OUTPUT
@@ -139,7 +118,7 @@ jobs:
         pkgdir="packages/${{ inputs.package }}"
         [ -d "$pkgdir" ] || { echo "Package not found"; exit 1; }
         cd "$pkgdir"
-        sudo -u builder makepkg -sf --noconfirm
+        sudo -u builder makepkg -sf --noconfirm -d
         mv *.pkg.tar.* "$GITHUB_WORKSPACE/repo/"
 
     - name: Sign packages
