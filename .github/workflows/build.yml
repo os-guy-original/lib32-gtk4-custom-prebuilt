@@ -86,7 +86,7 @@ jobs:
         for pkg in *.pkg.tar.zst; do
           [ -f "$pkg" ] || continue
           echo "Signing $pkg..."
-          gpg --batch --yes --detach-sign --armor -u $GPG_KEY_ID "$pkg"
+          gpg --batch --yes --detach-sign -u $GPG_KEY_ID -o "${pkg}.sig" "$pkg"
         done
         ls -la *.sig 2>/dev/null || echo "No signatures created"
 
