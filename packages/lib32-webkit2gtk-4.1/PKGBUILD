@@ -23,7 +23,6 @@ depends=(
     'lib32-gtk3'
     'lib32-harfbuzz'
     'lib32-harfbuzz-icu'
-    'lib32-hyphen'
     'lib32-icu'
     'lib32-lcms2'
     'lib32-libdrm'
@@ -62,19 +61,16 @@ sha256sums=('SKIP')
 build() {
     cd "webkitgtk-${pkgver}"
     
-    # 32-bit clang environment
     export CC='clang -m32'
     export CXX='clang++ -m32'
     export AR='llvm-ar'
     export NM='llvm-nm'
     export RANLIB='llvm-ranlib'
     
-    # Disable CET for JIT
     export CFLAGS="-m32 -fcf-protection=none ${CFLAGS}"
     export CXXFLAGS="-m32 -fcf-protection=none ${CXXFLAGS}"
     export LDFLAGS="-m32 -fuse-ld=lld ${LDFLAGS}"
     
-    # Reduce FORTIFY_SOURCE
     CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
     CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
     
@@ -102,7 +98,8 @@ build() {
         -DUSE_WOFF2=OFF \
         -DUSE_OPENJPEG=OFF \
         -DUSE_LIBMANETTE=OFF \
-        -DUSE_AVIF=OFF
+        -DUSE_AVIF=OFF \
+        -DUSE_HYPHEN=OFF
     
     cmake --build build
 }
@@ -111,7 +108,6 @@ package() {
     cd "webkitgtk-${pkgver}"
     DESTDIR="$pkgdir" cmake --install build
     
-    # Keep only 32-bit libs
     rm -rf "${pkgdir}/usr/"{bin,include,share}
     rm -rf "${pkgdir}/usr/lib32/pkgconfig"
     find "${pkgdir}" -name '*.a' -delete
