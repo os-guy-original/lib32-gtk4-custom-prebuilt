@@ -1,5 +1,19 @@
 name: Build lib32-gtk4
 
+# NOTE: For pushing to work from CI, you have two options:
+# 1. Use this workflow as-is with 'permissions: contents: write' (already set below)
+#    This works for pushing tags and releases but may not work for direct pushes to main
+# 2. For direct pushes to main branch, create a Personal Access Token (PAT):
+#    - Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
+#    - Generate new token with 'repo' scope
+#    - Add it as a repository secret named 'PAT'
+#    - Then use: env:
+#        GITHUB_TOKEN: ${{ secrets.PAT }}
+#    instead of ${{ secrets.GITHUB_TOKEN }} in push steps
+
+permissions:
+  contents: write  # Allow pushing tags and releases
+
 on:
   push:
     branches: [main, master]
@@ -23,7 +37,100 @@ env:
   MAKEFLAGS: '-j$(nproc)'
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.checks.outputs.ready }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check disk space
+        run: |
+          echo "::group::Disk Space Check"
+          df -h /
+          echo "::endgroup::"
+          AVAILABLE=$(df -BG / | awk 'NR==2 {print $4}' | tr -d 'G')
+          if [ "$AVAILABLE" -lt 10 ]; then
+            echo "ERROR: Less than 10GB available disk space"
+            exit 1
+          fi
+          echo "Disk space check passed"
+
+      - name: Check required tools (host)
+        run: |
+          echo "::group::Checking available tools"
+          echo "Note: Full tool checking happens in Arch container"
+          for tool in makepkg meson ninja pkgconf cmake autoconf automake libtool; do
+            if command -v $tool &> /dev/null; then
+              echo "$tool: $(which $tool)"
+            else
+              echo "$tool: not found (will be available in build container)"
+            fi
+          done
+          echo "::endgroup::"
+
+      - name: Validate PKGBUILD syntax
+        id: checks
+        run: |
+          echo "::group::Validating PKGBUILD files"
+          ERRORS=0
+          for pb in packages/*/PKGBUILD packages/*/*/PKGBUILD; do
+            [ -f "$pb" ] || continue
+            echo "Validating $pb"
+            if ! bash -n "$pb" 2>&1; then
+              echo "ERROR: Syntax error in $pb"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          echo "::endgroup::"
+          
+          if [ $ERRORS -gt 0 ]; then
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "PKGBUILD validation failed with $ERRORS error(s)"
+            exit 1
+          fi
+          echo "ready=true" >> $GITHUB_OUTPUT
+
+      - name: Check multilib repository availability
+        run: |
+          echo "::group::Checking multilib repository"
+          echo "Multilib check will be performed in the build container"
+          echo "The build container will verify:"
+          echo "  - multilib repo is enabled in pacman.conf"
+          echo "  - multilib packages are available"
+          echo "::endgroup::"
+
+      - name: Check dependencies are defined
+        run: |
+          echo "::group::Checking dependency configuration"
+          if [ -f scripts/dependencies.conf ]; then
+            echo "Dependencies file found:"
+            cat scripts/dependencies.conf
+          else
+            echo "No custom dependencies.conf found"
+          fi
+          
+          echo ""
+          echo "Checking for PKGBUILD files:"
+          PKG_COUNT=$(find packages -name "PKGBUILD" | wc -l)
+          echo "Found $PKG_COUNT PKGBUILD file(s)"
+          
+          if [ $PKG_COUNT -eq 0 ]; then
+            echo "ERROR: No PKGBUILD files found!"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+      - name: Summary
+        run: |
+          echo "### Pre-flight Checks Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Disk space: OK" >> $GITHUB_STEP_SUMMARY
+          echo "- PKGBUILD syntax: validated" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository structure: OK" >> $GITHUB_STEP_SUMMARY
+
   build:
+    needs: preflight
     runs-on: ubuntu-latest
     container: archlinux:latest
     
@@ -295,7 +402,7 @@ jobs:
         if-no-files-found: ignore
 
   release:
-    needs: build
+    needs: [build, preflight]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
