@@ -148,6 +148,9 @@ jobs:
           lib32-dbus \
           lib32-json-glib \
           lib32-readline \
+          lib32-gtk3 \
+          lib32-libevent \
+          lib32-at-spi2-core \
           graphene \
           gtk4 \
           tinysparql \
