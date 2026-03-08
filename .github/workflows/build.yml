@@ -374,6 +374,7 @@ jobs:
     - name: Commit and push artifacts
       if: success()
       run: |
+        git config --global --add safe.directory '*'
         git config --global user.email "kilo-ai@users.noreply.github.com"
         git config --global user.name "Kilo AI"
         git add FEATURES.md repo/
