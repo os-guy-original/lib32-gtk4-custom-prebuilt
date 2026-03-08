@@ -24,7 +24,7 @@ provides=(
   libgdbm_compat.so
 )
 source=(https://ftp.gnu.org/gnu/$_name/$_name-$pkgver.tar.gz)
-sha256sums=('b0b89ab9b5218777ce44ee7ef71c8ce89f35e6bfde9b5ce18df80c6b64626fff')
+sha256sums=('6a24504a14de4a744103dcb936be976df6fbe88ccff26065e54c1c47946f4a5e')
 
 build() {
   local configure_options=(

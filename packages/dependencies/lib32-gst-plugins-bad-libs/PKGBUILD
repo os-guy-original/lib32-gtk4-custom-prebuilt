@@ -52,6 +52,9 @@ build() {
     -D glib-checks=disabled
     -D opencv=disabled
     -D va=disabled
+    -D vaapi=disabled
+    -D msdk=disabled
+    -D d3d11=disabled
     -D package-name="Arch Linux ${pkgname} ${pkgver}-${pkgrel}"
     -D package-origin='https://www.archlinux.org/'
   )
