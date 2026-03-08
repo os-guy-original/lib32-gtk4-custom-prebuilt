@@ -106,3 +106,24 @@ find_pkgdir() {
     done
     return 1
 }
+
+# Check if package is already built and valid
+# Uses flexible version matching (prefix match)
+check_package_valid() {
+    local pkgname="$1"
+    local pkgver="$2"
+    
+    # Find any package file that matches name-version prefix
+    # This handles cases like 0.8 vs 0.8+r194+g3f79789
+    local pkgfile=$(ls "$REPO_DIR/${pkgname}-${pkgver}"*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
+    
+    [ -z "$pkgfile" ] && return 1
+    
+    # Check signature exists
+    [ ! -f "${pkgfile}.sig" ] && return 1
+    
+    # Verify signature (suppress output)
+    gpg --verify "${pkgfile}.sig" "$pkgfile" >/dev/null 2>&1 || return 1
+    
+    return 0
+}
