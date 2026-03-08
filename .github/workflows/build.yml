@@ -132,6 +132,7 @@ jobs:
           lib32-fribidi \
           lib32-gdk-pixbuf2 \
           lib32-libjpeg-turbo \
+          lib32-libva \
           lib32-libpng \
           lib32-libtiff \
           lib32-libx11 \
