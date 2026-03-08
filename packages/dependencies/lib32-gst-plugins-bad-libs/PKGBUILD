@@ -50,7 +50,6 @@ build() {
     -D gobject-cast-checks=disabled
     -D glib-asserts=disabled
     -D glib-checks=disabled
-    -D cuda=disabled
     -D opencv=disabled
     -D aja=disabled
     -D va=disabled
