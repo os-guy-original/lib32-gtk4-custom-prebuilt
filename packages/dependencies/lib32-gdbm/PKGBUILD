@@ -1,0 +1,52 @@
+# Maintainer: lib32-gtk4-custom-prebuilt project
+# Contributor: David Runge <dvzrv@archlinux.org>
+#
+# 32-bit version of gdbm for lib32-avahi.
+
+_name=gdbm
+pkgname=lib32-$_name
+pkgver=1.26
+pkgrel=1
+pkgdesc="GNU database library (32-bit)"
+arch=(x86_64)
+url="https://www.gnu.org/software/gdbm/gdbm.html"
+license=(GPL-3.0-or-later)
+depends=(
+  gdbm
+  lib32-glibc
+  lib32-readline
+)
+makedepends=(
+  lib32-gcc-libs
+)
+provides=(
+  libgdbm.so
+  libgdbm_compat.so
+)
+source=(https://ftp.gnu.org/gnu/$_name/$_name-$pkgver.tar.gz)
+sha256sums=('b0b89ab9b5218777ce44ee7ef71c8ce89f35e6bfde9b5ce18df80c6b64626fff')
+
+build() {
+  local configure_options=(
+    --prefix=/usr
+    --libdir=/usr/lib32
+    --libexecdir=/usr/lib32
+    --disable-static
+    --enable-libgdbm-compat
+  )
+
+  export CC='gcc -m32'
+  export CXX='g++ -m32'
+  export PKG_CONFIG_PATH='/usr/lib32/pkgconfig'
+
+  cd $_name-$pkgver
+  ./configure "${configure_options[@]}"
+  make
+}
+
+package() {
+  make DESTDIR="$pkgdir" -C $_name-$pkgver install
+
+  rm -rf "$pkgdir/usr/"{bin,include,share}
+  rm -rf "$pkgdir/usr/lib32/charset.alias"
+}

@@ -50,6 +50,7 @@ build() {
     -D gobject-cast-checks=disabled
     -D glib-asserts=disabled
     -D glib-checks=disabled
+    -D opencv=disabled
     -D package-name="Arch Linux ${pkgname} ${pkgver}-${pkgrel}"
     -D package-origin='https://www.archlinux.org/'
   )

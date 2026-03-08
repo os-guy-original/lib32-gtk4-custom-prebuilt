@@ -228,6 +228,13 @@ build_package_full() {
         done
     )
     
+    for pkg in "$PROJECT_ROOT/releases"/${pkgname}-*.pkg.tar.*; do
+        [[ -f "$pkg" ]] || continue
+        log_info "Installing $pkg so subsequent builds can find it..."
+        sudo pacman -U "$pkg" --noconfirm
+        break
+    done
+    
     return $?
 }
 
