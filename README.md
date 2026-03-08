@@ -23,3 +23,4 @@ The `lib32-gst-plugins-bad-libs` package is not included in this build. If your 
 ## License
 
 Each package retains its original license. See individual PKGBUILD files for details. Not affiliated with Arch Linux or GTK. Use at your own risk.
+# Trigger rebuild
