@@ -1,30 +1,26 @@
 #!/bin/bash
 # Build all packages in dependency order
+# Uses packages.conf for configuration
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OUTPUT_DIR="$PROJECT_ROOT/repo"
+REPO_DIR="$PROJECT_ROOT/repo"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
-
-info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
-ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-step()  { echo -e "\n${BOLD}${BLUE}==>${NC} ${BOLD}$*${NC}"; }
+# Source common functions
+source "$SCRIPT_DIR/common.sh"
 
 # Parse arguments
+FORCE_BUILD=0
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -o|--output) OUTPUT_DIR="$2"; shift 2 ;;
+        -f|--force) FORCE_BUILD=1; shift ;;
+        -h|--help)
+            echo "Usage: $0 [-f|--force]"
+            echo "  -f, --force  Force rebuild all packages"
+            exit 0
+            ;;
         *) shift ;;
     esac
 done
@@ -40,90 +36,102 @@ check_multilib() {
     info "Multilib repository: OK"
 }
 
-get_package_count() {
-    local deps_file="$SCRIPT_DIR/dependencies.conf"
-    local count=0
-    while IFS='|' read -r name _; do
-        [[ -z "$name" || "$name" =~ ^# || "$name" =~ ^NOTE: ]] && continue
-        count=$((count + 1))
-    done < "$deps_file"
-    echo $count
+build_package() {
+    local pkgname="$1"
+    local pkgver="$2"
+    local pkgdir
+    
+    pkgdir=$(find_pkgdir "$pkgname")
+    
+    if [ -z "$pkgdir" ]; then
+        error "Package directory not found: $pkgname"
+        return 1
+    fi
+    
+    if [ ! -f "$pkgdir/PKGBUILD" ]; then
+        error "PKGBUILD not found: $pkgname"
+        return 1
+    fi
+    
+    step "Building $pkgname"
+    info "Version: $pkgver"
+    
+    local pkg_start=$(date +%s)
+    
+    cd "$pkgdir"
+    
+    if bash -c "set -o pipefail; makepkg -sf --noconfirm --nocheck 2>&1 | tee /tmp/build-${pkgname}.log"; then
+        # Move to repo
+        mv "$pkgdir"/*.pkg.tar.* "$REPO_DIR/" 2>/dev/null || true
+        
+        # Install for subsequent builds
+        local pkg_file=$(ls "$REPO_DIR/${pkgname}"*.pkg.tar.* 2>/dev/null | grep -v debug | head -1)
+        if [ -f "$pkg_file" ]; then
+            info "Installing $pkgname for subsequent builds..."
+            sudo pacman -U "$pkg_file" --noconfirm --overwrite '*' 2>/dev/null || info "Package may already be installed"
+        fi
+        
+        local pkg_end=$(date +%s)
+        local duration=$((pkg_end - pkg_start))
+        
+        ok "$pkgname completed in ${duration}s"
+        cd "$PROJECT_ROOT"
+        return 0
+    else
+        error "Failed to build: $pkgname"
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
 }
 
-build_packages() {
-    local deps_file="$SCRIPT_DIR/dependencies.conf"
-    local built=0 failed=0
-    local total
+main() {
+    echo ""
+    echo -e "${BOLD}========================================${NC}"
+    echo -e "${BOLD}   lib32-prebuilts Build System${NC}"
+    echo -e "${BOLD}========================================${NC}"
+    echo ""
+    
+    check_multilib
+    
+    mkdir -p "$REPO_DIR"
+    
+    # Get build order
+    local packages
+    packages=$(get_build_order)
+    
+    local total=$(echo "$packages" | wc -l)
+    local current=0
+    local built=0
+    local skipped=0
+    local failed=0
     local start_time=$(date +%s)
     
-    [ -f "$deps_file" ] || { error "dependencies.conf not found"; exit 1; }
+    info "Packages to process: $total"
     
-    total=$(get_package_count)
-    
-    step "Starting build process"
-    info "Output directory: $OUTPUT_DIR"
-    info "Packages to build: $total"
-    
-    mkdir -p "$OUTPUT_DIR"
-    
-    local current=0
-    while IFS='|' read -r name version depends aur_url build_opts issues || [ -n "$name" ]; do
-        # Skip comments and empty lines
-        [[ -z "$name" || "$name" =~ ^# ]] && continue
-        [[ "$name" =~ ^NOTE: ]] && continue
-        
+    while IFS= read -r pkgname; do
+        [ -z "$pkgname" ] && continue
         current=$((current + 1))
         
-        # Find package directory
-        local pkgdir=""
-        for dir in "$PROJECT_ROOT/packages/dependencies/$name" "$PROJECT_ROOT/packages/$name"; do
-            [ -d "$dir" ] && { pkgdir="$dir"; break; }
-        done
+        # Get package info
+        local pkginfo
+        pkginfo=$(get_package_info "$pkgname")
+        IFS='|' read -r _ pkgver depends notes <<< "$pkginfo"
         
-        if [ ! -d "$pkgdir" ]; then
-            error "Package directory not found: $name"
-            failed=$((failed + 1))
+        # Check if already built (unless forced)
+        if [ $FORCE_BUILD -eq 0 ] && check_package_valid "$pkgname" "$pkgver"; then
+            info "[$current/$total] $pkgname - already built, skipping"
+            skipped=$((skipped + 1))
             continue
         fi
         
-        if [ ! -f "$pkgdir/PKGBUILD" ]; then
-            error "PKGBUILD not found: $name"
-            failed=$((failed + 1))
-            continue
-        fi
+        info "[$current/$total] $pkgname"
         
-        step "Building $name ($current/$total)"
-        info "Version: ${version:-unknown}"
-        if [ -n "$depends" ]; then
-            info "Depends on: $depends"
-        fi
-        
-        local pkg_start=$(date +%s)
-        
-        # Build the package - use set -o pipefail to catch errors
-        cd "$pkgdir"
-        if bash -c "set -o pipefail; makepkg -sf --noconfirm --nocheck 2>&1 | tee /tmp/build.log"; then
-            # Move built package to output
-            mv "$pkgdir"/*.pkg.tar.* "$OUTPUT_DIR/" 2>/dev/null || true
-            
-            # Install for subsequent builds (ignore errors)
-            local pkg_file=$(ls "$OUTPUT_DIR/${name}"*.pkg.tar.* 2>/dev/null | grep -v debug | head -1)
-            if [ -f "$pkg_file" ]; then
-                info "Installing $name for subsequent builds..."
-                sudo pacman -U "$pkg_file" --noconfirm --overwrite '*' 2>/dev/null || info "Note: Package may already be installed"
-            fi
-            
-            local pkg_end=$(date +%s)
-            local duration=$((pkg_end - pkg_start))
-            
-            ok "$name completed in ${duration}s"
+        if build_package "$pkgname" "$pkgver"; then
             built=$((built + 1))
         else
-            error "Failed to build: $name"
             failed=$((failed + 1))
         fi
-        cd "$PROJECT_ROOT"
-    done < "$deps_file"
+    done <<< "$packages"
     
     local end_time=$(date +%s)
     local total_time=$((end_time - start_time))
@@ -132,6 +140,7 @@ build_packages() {
     step "Build Summary"
     echo ""
     echo "  Built:   $built"
+    echo "  Skipped: $skipped"
     [ $failed -gt 0 ] && echo -e "  ${RED}Failed:  $failed${NC}"
     echo "  Time:    ${total_time}s"
     echo ""
@@ -141,15 +150,7 @@ build_packages() {
         exit 1
     fi
     
-    ok "All $built packages built successfully in ${total_time}s"
+    ok "All packages processed in ${total_time}s"
 }
 
-# Main
-echo ""
-echo -e "${BOLD}========================================${NC}"
-echo -e "${BOLD}   lib32-prebuilts Build System${NC}"
-echo -e "${BOLD}========================================${NC}"
-echo ""
-
-check_multilib
-build_packages
+main

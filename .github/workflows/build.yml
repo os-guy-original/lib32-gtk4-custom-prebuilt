@@ -6,10 +6,19 @@ permissions:
 on:
   push:
     branches: [main, master]
+    paths:
+      - 'packages/**'
+      - 'packages.conf'
+      - 'scripts/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
       package:
         description: 'Build specific package only'
+      force:
+        description: 'Force rebuild all packages'
+        type: boolean
+        default: false
 
 env:
   PACKAGER: 'Kilo AI <kilo-ai@users.noreply.github.com>'
@@ -53,6 +62,7 @@ jobs:
 
     - name: Install 32-bit dependencies
       run: |
+        # Read packages.conf and install required dependencies
         pacman -S --noconfirm --needed \
           lib32-glib2 lib32-pcre2 lib32-libffi lib32-zlib lib32-util-linux \
           lib32-icu lib32-libsoup3 lib32-sqlite lib32-gstreamer \
@@ -67,15 +77,37 @@ jobs:
           libcloudproviders wayland-protocols vulkan-headers \
           lib32-sdl2 lib32-alsa-lib lib32-libvdpau \
           lib32-freetype2 lib32-fontconfig lib32-fribidi \
-          ffmpeg
+          ffmpeg glib2-devel
+
+    - name: Check packages status
+      id: check
+      run: |
+        chmod +x scripts/*.sh
+        source scripts/common.sh
+        
+        if [ "${{ inputs.force }}" = "true" ]; then
+          echo "Force rebuild requested"
+          echo "needs_build=all" >> $GITHUB_OUTPUT
+        else
+          # Check each package
+          needs_build="no"
+          while IFS='|' read -r name version depends notes; do
+            [[ -z "$name" || "$name" =~ ^# ]] && continue
+            if ! check_package_valid "$name" "$version"; then
+              needs_build="yes"
+              echo "Needs build: $name"
+            fi
+          done < packages.conf
+          echo "needs_build=$needs_build" >> $GITHUB_OUTPUT
+        fi
 
     - name: Build packages
+      if: steps.check.outputs.needs_build != 'no' || inputs.force == true
       run: |
-        # Remove old .sig files to avoid signature verification issues
-        rm -f repo/*.sig
+        FORCE_FLAG=""
+        [ "${{ inputs.force }}" = "true" ] && FORCE_FLAG="-f"
         
-        chmod +x scripts/build-all.sh
-        sudo -u builder ./scripts/build-all.sh -o "$PWD/repo" 2>&1 | tee build.log
+        sudo -u builder ./scripts/build-all.sh $FORCE_FLAG 2>&1 | tee build.log
 
     - name: Build specific package
       if: inputs.package != ''
@@ -91,10 +123,14 @@ jobs:
         cd repo
         for pkg in *.pkg.tar.zst; do
           [ -f "$pkg" ] || continue
-          echo "Signing $pkg..."
-          gpg --batch --yes --detach-sign -u $GPG_KEY_ID -o "${pkg}.sig" "$pkg"
+          if [ ! -f "${pkg}.sig" ] || ! gpg --verify "${pkg}.sig" "$pkg" 2>/dev/null; then
+            echo "Signing $pkg..."
+            gpg --batch --yes --detach-sign -u $GPG_KEY_ID -o "${pkg}.sig" "$pkg"
+          else
+            echo "Signature valid: $pkg"
+          fi
         done
-        ls -la *.sig 2>/dev/null || echo "No signatures created"
+        ls -la *.sig 2>/dev/null || echo "No signatures"
 
     - name: Update repository database
       run: |

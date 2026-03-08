@@ -1,0 +1,106 @@
+# Maintainer: lib32-prebuilts
+# Based on official Arch package
+# WARNING: This package takes 2-4+ hours to build
+
+pkgname=lib32-webkitgtk-6.0
+pkgver=2.50.5
+pkgrel=1
+pkgdesc='Web content engine for GTK (GTK4-based) - 32-bit'
+arch=('x86_64')
+url='https://webkitgtk.org'
+license=('LGPL-2.1-or-later')
+depends=(
+    'lib32-glib2'
+    'lib32-glibc'
+    'lib32-harfbuzz'
+    'lib32-harfbuzz-icu'
+    'lib32-icu'
+    'lib32-cairo'
+    'lib32-libdrm'
+    'lib32-libepoxy'
+    'lib32-libgcrypt'
+    'lib32-libjpeg-turbo'
+    'lib32-libpng'
+    'lib32-libseccomp'
+    'lib32-libsoup3'
+    'lib32-libtasn1'
+    'lib32-libwebp'
+    'lib32-libx11'
+    'lib32-libxml2'
+    'lib32-libxslt'
+    'lib32-lcms2'
+    'lib32-sqlite'
+    'lib32-wayland'
+    'lib32-gtk4'
+    'lib32-gstreamer'
+    'lib32-gst-plugins-base-libs'
+    'webkitgtk-6.0'
+)
+makedepends=(
+    'cmake'
+    'ninja'
+    'clang'
+    'lld'
+    'glib2-devel'
+    'lib32-gcc-libs'
+    'wayland-protocols'
+)
+provides=('lib32-libwebkitgtk-6.0.so')
+source=("https://webkitgtk.org/releases/webkitgtk-${pkgver}.tar.xz")
+sha256sums=('SKIP')
+
+build() {
+    cd "webkitgtk-${pkgver}"
+    
+    # 32-bit build environment
+    export CC='clang -m32'
+    export CXX='clang++ -m32'
+    export AR='llvm-ar'
+    export NM='llvm-nm'
+    export RANLIB='llvm-ranlib'
+    
+    # Disable CET for JIT compatibility
+    export CFLAGS="-m32 -fcf-protection=none ${CFLAGS}"
+    export CXXFLAGS="-m32 -fcf-protection=none ${CXXFLAGS}"
+    export LDFLAGS="-m32 -fuse-ld=lld ${LDFLAGS}"
+    
+    # Reduce FORTIFY_SOURCE for 32-bit
+    CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    
+    export PKG_CONFIG_PATH='/usr/lib32/pkgconfig'
+    
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib32 \
+        -DCMAKE_INSTALL_LIBEXECDIR=lib32 \
+        -DPORT=GTK \
+        -DENABLE_BUBBLEWRAP_SANDBOX=OFF \
+        -DENABLE_DOCUMENTATION=OFF \
+        -DENABLE_GEOLOCATION=OFF \
+        -DENABLE_INTROSPECTION=OFF \
+        -DENABLE_WAYLAND_TARGET=ON \
+        -DENABLE_X11_TARGET=ON \
+        -DUSE_GSTREAMER_GL=OFF \
+        -DUSE_LIBNOTIFY=OFF \
+        -DUSE_LIBSECRET=OFF \
+        -DUSE_SYSTEMD=OFF \
+        -DUSE_WOFF2=OFF \
+        -DENABLE_GAMEPAD=OFF \
+        -DENABLE_WEBDRIVER=OFF
+    
+    cmake --build build
+}
+
+package() {
+    cd "webkitgtk-${pkgver}"
+    DESTDIR="$pkgdir" cmake --install build
+    
+    # Remove 64-bit files and keep only 32-bit libs
+    rm -rf "${pkgdir}/usr/"{bin,include,share}
+    rm -rf "${pkgdir}/usr/lib32/pkgconfig"
+    
+    # Remove static libraries
+    find "${pkgdir}" -name '*.a' -delete
+}
