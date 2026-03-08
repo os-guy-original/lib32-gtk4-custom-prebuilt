@@ -64,7 +64,7 @@ provides=("lib${_basename}-${pkgver%%.*}.so")
 _pkgsrc="${_basename}-${pkgver}"
 source=(
     "${_pkgsrc}.tar.xz::https://download.gnome.org/sources/${_basename}/${pkgver%.*}/${_pkgsrc}.tar.xz"
-    'patches/0001-HACK-Don-t-use-objcopy-for-resource-embedding.patch'
+    '0001-HACK-Don-t-use-objcopy-for-resource-embedding.patch'
     "${pkgname}-querymodules.hook"
     "${pkgname}-querymodules.script"
 )
@@ -75,7 +75,7 @@ sha256sums=('e1817c650ddc3261f9a8345b3b22a26a5d80af154630dedc03cc7becefffd0fa'
 
 prepare() {
     cd "${srcdir}/${_pkgsrc}"
-    patch -Np1 -i "${srcdir}/patches/0001-HACK-Don-t-use-objcopy-for-resource-embedding.patch"
+    patch -Np1 -i "${srcdir}/0001-HACK-Don-t-use-objcopy-for-resource-embedding.patch"
 }
 
 build() {
