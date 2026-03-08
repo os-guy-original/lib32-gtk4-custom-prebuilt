@@ -251,6 +251,28 @@ jobs:
           echo "package_count=0" >> $GITHUB_OUTPUT
         fi
 
+    - name: Detect features
+      run: |
+        chmod +x scripts/detect-features.sh
+        ./scripts/detect-features.sh
+
+    - name: Update repo database
+      if: success()
+      run: |
+        chmod +x repo/update-repo.sh
+        ./repo/update-repo.sh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Commit and push artifacts
+      if: success()
+      run: |
+        git config --global user.email "kilo-ai@users.noreply.github.com"
+        git config --global user.name "Kilo AI"
+        git add FEATURES.md repo/
+        git commit -m "chore: update FEATURES.md and repo" || echo "No changes to commit"
+        git push origin main || echo "Push failed, this is expected for PRs"
+
     - name: Upload packages artifact
       if: steps.collect.outputs.packages_built == 'true'
       uses: actions/upload-artifact@v4
