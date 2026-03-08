@@ -50,24 +50,9 @@ get_package_count() {
     echo $count
 }
 
-build_package() {
-    local pkgdir="$1"
-    local name="$2"
-    local build_log="/tmp/build-${name}.log"
-    
-    cd "$pkgdir"
-    
-    # Run makepkg and capture output
-    if makepkg -sf --noconfirm --nocheck 2>&1 | tee "$build_log"; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 build_packages() {
     local deps_file="$SCRIPT_DIR/dependencies.conf"
-    local built=0 failed=0 skipped=0
+    local built=0 failed=0
     local total
     local start_time=$(date +%s)
     
@@ -115,8 +100,9 @@ build_packages() {
         
         local pkg_start=$(date +%s)
         
-        # Build the package
-        if build_package "$pkgdir" "$name"; then
+        # Build the package - use set -o pipefail to catch errors
+        cd "$pkgdir"
+        if bash -c "set -o pipefail; makepkg -sf --noconfirm --nocheck 2>&1 | tee /tmp/build.log"; then
             # Move built package to output
             mv "$pkgdir"/*.pkg.tar.* "$OUTPUT_DIR/" 2>/dev/null || true
             
@@ -136,6 +122,7 @@ build_packages() {
             error "Failed to build: $name"
             failed=$((failed + 1))
         fi
+        cd "$PROJECT_ROOT"
     done < "$deps_file"
     
     local end_time=$(date +%s)

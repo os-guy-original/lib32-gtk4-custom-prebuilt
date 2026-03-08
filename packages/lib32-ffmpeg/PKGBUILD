@@ -27,14 +27,12 @@ depends=(
     'lib32-sdl2'
     'lib32-libva'
     'lib32-libvdpau'
-    'lib32-freetype2'
-    'lib32-fontconfig'
-    'lib32-fribidi'
     'ffmpeg'
 )
 makedepends=(
     'nasm'
     'yasm'
+    'lib32-gcc-libs'
 )
 provides=('lib32-libavcodec.so' 'lib32-libavdevice.so' 'lib32-libavfilter.so' 'lib32-libavformat.so'
           'lib32-libavutil.so' 'lib32-libpostproc.so' 'lib32-libswresample.so' 'lib32-libswscale.so')
@@ -46,9 +44,14 @@ sha256sums=('SKIP')
 build() {
     cd "${_pkgname}-${pkgver}"
 
+    # 32-bit build environment
     export CC='gcc -m32'
     export CXX='g++ -m32'
+    export LD='ld -m elf_i386'
     export PKG_CONFIG_PATH='/usr/lib32/pkgconfig'
+    export CFLAGS="-m32 -fPIC ${CFLAGS}"
+    export CXXFLAGS="-m32 -fPIC ${CXXFLAGS}"
+    export LDFLAGS="-m32 ${LDFLAGS}"
 
     ./configure \
         --prefix='/usr' \
@@ -82,7 +85,9 @@ build() {
         --disable-libass \
         --disable-libfreetype \
         --disable-libfontconfig \
-        --disable-libfribidi
+        --disable-libfribidi \
+        --disable-lto \
+        --disable-asm
 
     make
 }
