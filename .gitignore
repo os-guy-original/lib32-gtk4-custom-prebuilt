@@ -16,7 +16,6 @@ src/
 !repo/*.tar.gz
 !repo/*.db
 !repo/*.files
-!repo/*.sig
 !repo/*.pub
 
 # Build metadata files
@@ -38,6 +37,9 @@ makepkg.log
 # PGP signatures
 *.asc
 *.sig
+
+# Allow repo signatures
+!repo/*.sig
 
 # Checksum files
 *.md5
