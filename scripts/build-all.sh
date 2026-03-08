@@ -212,6 +212,7 @@ build_package_full() {
     local logfile="$PROJECT_ROOT/releases/build-${pkgname}.log"
     mkdir -p "$PROJECT_ROOT/releases"
     
+    local makepkg_exit_code=0
     (
         cd "$pkgdir"
         
@@ -227,15 +228,30 @@ build_package_full() {
             log_success "Package built: $pkg"
         done
     )
+    makepkg_exit_code=$?
     
+    local built_pkg=""
     for pkg in "$PROJECT_ROOT/releases"/${pkgname}-*.pkg.tar.*; do
-        [[ -f "$pkg" ]] || continue
-        log_info "Installing $pkg so subsequent builds can find it..."
-        sudo pacman -U "$pkg" --noconfirm
-        break
+        if [[ -f "$pkg" ]]; then
+            built_pkg="$pkg"
+            break
+        fi
     done
     
-    return $?
+    if [[ -z "$built_pkg" ]]; then
+        log_error "Build failed for $pkgname: No package file found in releases/"
+        return 1
+    fi
+    
+    if [[ $makepkg_exit_code -ne 0 ]]; then
+        log_error "Build failed for $pkgname: makepkg exited with code $makepkg_exit_code"
+        return 1
+    fi
+    
+    log_info "Installing $built_pkg so subsequent builds can find it..."
+    sudo pacman -U "$built_pkg" --noconfirm
+    
+    return 0
 }
 
 report_error() {
