@@ -1,0 +1,64 @@
+{
+  "$schema": "https://kilo.ai/schemas/config/v1",
+  "version": "1.0.0",
+  "metadata": {
+    "project": "lib32-gtk4-custom-prebuilt",
+    "description": "Prebuilt lib32-gtk4 packages for Arch Linux multilib",
+    "purpose": "AI-assisted maintenance and build automation testing",
+    "maintainer": "automated"
+  },
+  "agent": {
+    "name": "lib32-gtk4-builder",
+    "scope": {
+      "repositories": ["."],
+      "branches": ["main", "master"],
+      "paths": {
+        "allow": [
+          "packages/**",
+          "scripts/**",
+          ".github/workflows/**",
+          "README.md",
+          ".gitignore"
+        ],
+        "deny": [
+          ".secrets/**",
+          "*.key",
+          "*.pem",
+          ".env*"
+        ]
+      }
+    },
+    "permissions": {
+      "operations": ["read", "write", "build", "commit", "create_pr"],
+      "restrictions": {
+        "force_push": false,
+        "delete_main_branch": false,
+        "modify_protected_branches": false,
+        "access_secrets": false,
+        "run_arbitrary_commands": true
+      }
+    },
+    "limits": {
+      "max_file_size_mb": 10,
+      "max_files_per_commit": 50,
+      "max_commits_per_session": 10,
+      "timeout_minutes": 120
+    }
+  },
+  "build": {
+    "environment": "archlinux",
+    "container": "archlinux:latest",
+    "multilib_required": true,
+    "dependencies": [
+      "base-devel",
+      "git",
+      "multilib-devel"
+    ]
+  },
+  "safety": {
+    "require_review": false,
+    "auto_merge": false,
+    "notify_on_changes": true,
+    "backup_before_modify": true
+  }
+}

@@ -1,0 +1,222 @@
+name: Build lib32-gtk4
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      skip_deps:
+        description: 'Skip dependency builds'
+        required: false
+        default: 'false'
+      package:
+        description: 'Build specific package only'
+        required: false
+        default: ''
+
+env:
+  PACKAGER: 'GitHub Actions <actions@github.com>'
+  MAKEFLAGS: '-j$(nproc)'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    
+    steps:
+    - name: Setup build environment
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm base-devel git multilib-devel sudo
+
+    - name: Enable multilib repository
+      run: |
+        sed -i '/#\[multilib\]/,/#Include/ s/^#//' /etc/pacman.conf || {
+          echo '[multilib]' >> /etc/pacman.conf
+          echo 'Include = /etc/pacman.d/mirrorlist' >> /etc/pacman.conf
+        }
+        pacman -Sy --noconfirm
+
+    - name: Verify multilib enabled
+      run: |
+        pacman -Sl multilib | head -5 || { echo "ERROR: multilib not enabled"; exit 1; }
+        echo "multilib repository enabled successfully"
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Create build user
+      run: |
+        useradd -m -G wheel builder
+        echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+        chown -R builder:builder .
+
+    - name: Load dependency configuration
+      id: deps
+      run: |
+        if [ -f scripts/dependencies.conf ]; then
+          echo "dependencies_loaded=true" >> $GITHUB_OUTPUT
+          echo "::group::Dependency Configuration"
+          cat scripts/dependencies.conf
+          echo "::endgroup::"
+        else
+          echo "dependencies_loaded=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build dependencies
+      if: inputs.skip_deps != 'true'
+      run: |
+        echo "::group::Building dependencies"
+        if [ -f scripts/build-all.sh ]; then
+          chmod +x scripts/build-all.sh
+          sudo -u builder ./scripts/build-all.sh 2>&1 | tee build.log
+        elif [ -f scripts/common.sh ]; then
+          source scripts/common.sh
+          log_info "Building packages in dependency order..."
+          for pkgdir in packages/*/; do
+            [ -d "$pkgdir" ] || continue
+            pkgname=$(basename "$pkgdir")
+            log_info "Building: $pkgname"
+            cd "$pkgdir"
+            sudo -u builder makepkg -sf --noconfirm 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log" || {
+              log_error "Failed to build: $pkgname"
+              detect_build_error "$GITHUB_WORKSPACE/build.log"
+            }
+            cd - > /dev/null
+          done
+        else
+          echo "No build scripts found, attempting manual build..."
+        fi
+        echo "::endgroup::"
+      continue-on-error: true
+
+    - name: Build specific package
+      if: inputs.package != ''
+      run: |
+        pkgdir="packages/${{ inputs.package }}"
+        if [ -d "$pkgdir" ]; then
+          echo "::group::Building ${{ inputs.package }}"
+          cd "$pkgdir"
+          sudo -u builder makepkg -sf --noconfirm 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          echo "::endgroup::"
+        else
+          echo "Package directory not found: $pkgdir"
+          exit 1
+        fi
+
+    - name: Detect build errors
+      if: failure()
+      run: |
+        if [ -f build.log ]; then
+          echo "::group::Build Error Analysis"
+          if grep -q "error:" build.log; then
+            echo "### Build Errors Found:" >> $GITHUB_STEP_SUMMARY
+            grep -A 3 "error:" build.log | head -20 >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "missing dependency" build.log; then
+            echo "### Missing Dependencies:" >> $GITHUB_STEP_SUMMARY
+            grep "missing dependency" build.log >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "cannot find" build.log; then
+            echo "### Not Found Errors:" >> $GITHUB_STEP_SUMMARY
+            grep "cannot find" build.log | head -10 >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "::endgroup::"
+        fi
+
+    - name: Collect built packages
+      id: collect
+      run: |
+        mkdir -p artifacts
+        find . -name "*.pkg.tar.zst" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
+        find . -name "*.pkg.tar.xz" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
+        
+        echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -d artifacts ] && [ "$(ls -A artifacts 2>/dev/null)" ]; then
+          echo "Built packages:" >> $GITHUB_STEP_SUMMARY
+          for pkg in artifacts/*; do
+            [ -f "$pkg" ] || continue
+            pkgbasename=$(basename "$pkg")
+            size=$(du -h "$pkg" | cut -f1)
+            echo "- \`$pkgbasename\` ($size)" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "packages_built=true" >> $GITHUB_OUTPUT
+          echo "package_count=$(ls artifacts/*.pkg.tar.* 2>/dev/null | wc -l)" >> $GITHUB_OUTPUT
+        else
+          echo "No packages were built successfully." >> $GITHUB_STEP_SUMMARY
+          echo "packages_built=false" >> $GITHUB_OUTPUT
+          echo "package_count=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload packages artifact
+      if: steps.collect.outputs.packages_built == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: lib32-gtk4-packages
+        path: artifacts/*.pkg.tar.*
+        retention-days: 30
+        if-no-files-found: warn
+
+    - name: Upload build logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          build.log
+          **/build.log
+          **/*.log
+        retention-days: 7
+        if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: lib32-gtk4-packages
+        path: packages
+
+    - name: Create release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        
+        echo "### Release $TAG_NAME" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Prebuilt lib32-gtk4 packages for Arch Linux multilib." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "#### Included Packages:" >> release_notes.md
+        for pkg in packages/*.pkg.tar.*; do
+          [ -f "$pkg" ] || continue
+          pkgname=$(basename "$pkg")
+          echo "- \`$pkgname\`" >> release_notes.md
+        done
+        echo "" >> release_notes.md
+        echo "#### Installation:" >> release_notes.md
+        echo "\`\`\`bash" >> release_notes.md
+        echo "sudo pacman -U packages/*.pkg.tar.zst" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        
+        gh release create "$TAG_NAME" \
+          --title "Release $TAG_NAME" \
+          --notes-file release_notes.md \
+          packages/*.pkg.tar.* || \
+        gh release upload "$TAG_NAME" packages/*.pkg.tar.* --clobber

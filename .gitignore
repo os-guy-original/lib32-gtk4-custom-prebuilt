@@ -1,0 +1,70 @@
+# Arch Linux package build artifacts
+pkg/
+src/
+
+# Package files
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.pkg.tar.gz
+*.tar.xz
+*.tar.gz
+*.tar.bz2
+*.tar.zst
+
+# Build metadata files
+.BUILDINFO
+.MTREE
+.PKGINFO
+.CHANGES
+
+# Log files
+*.log
+build.log
+makepkg.log
+
+# Source archives (usually downloaded by makepkg)
+*.src.tar.gz
+*.src.tar.xz
+*.src.tar.zst
+
+# PGP signatures
+*.asc
+*.sig
+
+# Checksum files
+*.md5
+*.sha256
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# Editor/IDE files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build scripts local config
+scripts/local.conf
+.env
+.env.local
+
+# Releases directory (generated)
+releases/
+
+# Research and reference directories
+research/
+aur-reference/
+
+# State and cache directories
+.state/
+.cache/

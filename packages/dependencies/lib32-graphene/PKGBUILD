@@ -1,0 +1,52 @@
+# Maintainer: lib32-gtk4-custom-prebuilt project
+# Contributor: DarioTD
+# Contributor: Andrew Sun <adsun701@gmail.com>
+# Contributor: orumin <dev@orum.in>
+#
+# This is a patched version from AUR with introspection disabled
+# for cross-compilation compatibility.
+
+_basename=graphene
+pkgname="lib32-$_basename"
+pkgver=1.10.8
+pkgrel=3
+pkgdesc="A thin layer of graphic data types (32-bit)"
+url="https://github.com/ebassi/graphene"
+arch=('x86_64')
+license=('MIT')
+depends=('lib32-glib2' 'graphene')
+makedepends=('git' 'meson')
+_commit=4e2578450809c2099400cf85caf18eafcd7100aa
+source=("git+https://github.com/ebassi/graphene#commit=$_commit")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd $_basename
+  git describe --tags | sed 's/-/+/g'
+}
+
+build() {
+  local meson_options=(
+    -D gtk_doc=false
+    -D introspection=disabled
+    -D tests=false
+  )
+
+  export CC='gcc -m32'
+  export CXX='g++ -m32'
+  export PKG_CONFIG='/usr/bin/i686-pc-linux-gnu-pkg-config'
+
+  arch-meson $_basename build \
+    --libdir=/usr/lib32 \
+    --libexecdir=/usr/lib32 \
+    "${meson_options[@]}"
+
+  meson compile -C build
+}
+
+package() {
+  DESTDIR="$pkgdir" meson install -C build
+  
+  rm -rf "$pkgdir"/usr/{bin,share,include,lib}
+  rm -rf "$pkgdir"/usr/lib32/installed-tests 2>/dev/null || true
+}
