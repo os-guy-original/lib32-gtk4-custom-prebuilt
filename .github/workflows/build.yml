@@ -42,7 +42,7 @@ jobs:
         fi
         
         pacman -Sy --noconfirm
-        pacman -S --noconfirm --needed base-devel git multilib-devel sudo meson ninja pkgconf cmake gnupg nasm yasm clang lld gperf
+        pacman -S --noconfirm --needed base-devel git multilib-devel sudo meson ninja pkgconf cmake gnupg nasm yasm clang lld gperf unifdef
 
     - name: Checkout
       uses: actions/checkout@v4
