@@ -91,7 +91,7 @@ build() {
         -D x11-backend=true
         -D wayland-backend=true
         -D broadway-backend=true
-        -D media-gstreamer=enabled
+        -D media-gstreamer=disabled
         -D print-cpdb=disabled
         -D print-cups=enabled
         -D vulkan=enabled
