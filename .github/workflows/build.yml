@@ -29,7 +29,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: archlinux:latest
-    timeout-minutes: 360  # 6 hours for webkit
+    timeout-minutes: 360
     
     steps:
     - name: Setup Arch Linux
@@ -52,7 +52,6 @@ jobs:
         GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       run: |
         echo "$GPG_PRIVATE_KEY" | gpg --import --batch
-        echo "GPG key imported"
 
     - name: Setup build user
       run: |
@@ -66,7 +65,7 @@ jobs:
           lib32-glib2 lib32-pcre2 lib32-libffi lib32-zlib lib32-util-linux \
           lib32-icu lib32-libsoup3 lib32-sqlite lib32-gstreamer \
           lib32-gst-plugins-base-libs lib32-orc lib32-colord lib32-libcups \
-          lib32-libepoxy lib32-harfbuzz lib32-pango lib32-cairo lib32-fontconfig \
+          lib32-libepoxy lib32-harfbuzz lib32-harfbuzz-icu lib32-pango lib32-cairo lib32-fontconfig \
           lib32-fribidi lib32-gdk-pixbuf2 lib32-libjpeg-turbo lib32-libva \
           lib32-libpng lib32-libtiff lib32-libx11 lib32-libxcursor lib32-libxdamage \
           lib32-libxext lib32-libxfixes lib32-libxi lib32-libxinerama \
@@ -87,18 +86,14 @@ jobs:
         source scripts/common.sh
         
         if [ "${{ inputs.force }}" = "true" ]; then
-          echo "Force rebuild requested"
           echo "needs_build=all" >> $GITHUB_OUTPUT
         else
           needs_build="no"
           while IFS='|' read -r name version depends notes; do
             [[ -z "$name" || "$name" =~ ^# ]] && continue
-            
             if ! check_package_valid "$name" "$version"; then
               needs_build="yes"
               echo "Needs build: $name"
-            else
-              echo "Valid: $name"
             fi
           done < packages.conf
           echo "needs_build=$needs_build" >> $GITHUB_OUTPUT
@@ -109,7 +104,6 @@ jobs:
       run: |
         FORCE_FLAG=""
         [ "${{ inputs.force }}" = "true" ] && FORCE_FLAG="-f"
-        
         sudo -u builder ./scripts/build-all.sh $FORCE_FLAG 2>&1 | tee build.log
 
     - name: Build specific package
@@ -129,11 +123,8 @@ jobs:
           if [ ! -f "${pkg}.sig" ] || ! gpg --verify "${pkg}.sig" "$pkg" 2>/dev/null; then
             echo "Signing $pkg..."
             gpg --batch --yes --detach-sign -u $GPG_KEY_ID -o "${pkg}.sig" "$pkg"
-          else
-            echo "Signature valid: $pkg"
           fi
         done
-        ls -la *.sig 2>/dev/null || echo "No signatures"
 
     - name: Update repository database
       run: |
@@ -146,7 +137,6 @@ jobs:
         git config --global --add safe.directory '*'
         git config --global user.email "kilo-ai@users.noreply.github.com"
         git config --global user.name "Kilo AI"
-        
         git add -f repo/
         git commit -m "chore: update packages and repo database" || echo "No changes"
         git push origin main
