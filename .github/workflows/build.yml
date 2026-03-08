@@ -156,7 +156,8 @@ jobs:
           gtk4 \
           tinysparql \
           gst-plugins-bad \
-          libcloudproviders
+          libcloudproviders \
+          wayland-protocols
         echo "::endgroup::"
 
     - name: Build dependencies
