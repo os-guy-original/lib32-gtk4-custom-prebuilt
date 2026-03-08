@@ -54,7 +54,6 @@ build() {
     -D aja=disabled
     -D va=disabled
     -D msdk=disabled
-    -D amf=disabled
     -D d3d11=disabled
     -D vulkan=disabled
     -D webrtc=disabled
