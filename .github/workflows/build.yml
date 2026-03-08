@@ -77,7 +77,7 @@ jobs:
           lib32-sdl2 lib32-alsa-lib lib32-libvdpau \
           lib32-freetype2 lib32-fontconfig lib32-fribidi \
           lib32-libgcrypt lib32-libtasn1 lib32-libwebp \
-          lib32-lcms2 lib32-libavif lib32-libxslt \
+          lib32-lcms2 lib32-libxslt lib32-atk \
           ffmpeg glib2-devel ruby python
 
     - name: Check packages status

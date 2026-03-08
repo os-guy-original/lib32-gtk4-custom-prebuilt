@@ -25,7 +25,6 @@ depends=(
     'lib32-harfbuzz-icu'
     'lib32-icu'
     'lib32-lcms2'
-    'lib32-libavif'
     'lib32-libdrm'
     'lib32-libepoxy'
     'lib32-libgcrypt'
@@ -100,7 +99,8 @@ build() {
         -DUSE_LIBBACKTRACE=OFF \
         -DUSE_WOFF2=OFF \
         -DUSE_OPENJPEG=OFF \
-        -DUSE_LIBMANETTE=OFF
+        -DUSE_LIBMANETTE=OFF \
+        -DUSE_AVIF=OFF
     
     cmake --build build
 }
