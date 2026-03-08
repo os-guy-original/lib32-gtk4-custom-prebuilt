@@ -19,7 +19,7 @@ on:
         default: ''
 
 env:
-  PACKAGER: 'GitHub Actions <actions@github.com>'
+  PACKAGER: 'Kilo AI <kilo-ai@users.noreply.github.com>'
   MAKEFLAGS: '-j$(nproc)'
 
 jobs:
@@ -30,21 +30,42 @@ jobs:
     steps:
     - name: Setup build environment
       run: |
-        pacman -Syu --noconfirm
-        pacman -S --noconfirm base-devel git multilib-devel sudo
-
-    - name: Enable multilib repository
-      run: |
-        sed -i '/#\[multilib\]/,/#Include/ s/^#//' /etc/pacman.conf || {
-          echo '[multilib]' >> /etc/pacman.conf
-          echo 'Include = /etc/pacman.d/mirrorlist' >> /etc/pacman.conf
-        }
+        set -e
+        
+        echo "::group::Initializing pacman keyring"
+        pacman-key --init
+        pacman-key --populate archlinux
+        echo "::endgroup::"
+        
+        echo "::group::Enabling multilib repository"
+        if grep -q '^\[multilib\]' /etc/pacman.conf; then
+          echo "multilib already enabled in pacman.conf"
+        else
+          if grep -q '^#\[multilib\]' /etc/pacman.conf; then
+            sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+          else
+            echo "" >> /etc/pacman.conf
+            echo '[multilib]' >> /etc/pacman.conf
+            echo 'Include = /etc/pacman.d/mirrorlist' >> /etc/pacman.conf
+          fi
+        fi
+        echo "::endgroup::"
+        
+        echo "::group::Syncing package databases"
         pacman -Sy --noconfirm
-
-    - name: Verify multilib enabled
-      run: |
-        pacman -Sl multilib | head -5 || { echo "ERROR: multilib not enabled"; exit 1; }
+        echo "::endgroup::"
+        
+        echo "::group::Verifying multilib repository"
+        if ! pacman -Sl multilib 2>/dev/null | head -1; then
+          echo "ERROR: multilib repository not available"
+          exit 1
+        fi
         echo "multilib repository enabled successfully"
+        echo "::endgroup::"
+        
+        echo "::group::Installing build dependencies"
+        pacman -S --noconfirm --needed base-devel git multilib-devel sudo
+        echo "::endgroup::"
 
     - name: Checkout repository
       uses: actions/checkout@v4
