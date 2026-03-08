@@ -1,7 +1,13 @@
 #!/bin/bash
 # Common functions for lib32-prebuilts
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Use PWD when sourced, or script dir when executed directly
+if [[ -n "${BASH_SOURCE[0]}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    SCRIPT_DIR="$(pwd)/scripts"
+fi
+
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="$PROJECT_ROOT/packages.conf"
 REPO_DIR="$PROJECT_ROOT/repo"
@@ -21,20 +27,16 @@ warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 step()  { echo -e "\n${BOLD}${BLUE}==>${NC} ${BOLD}$*${NC}"; }
 
-# Get all packages from config
 get_packages() {
     [ ! -f "$CONFIG_FILE" ] && return 1
-    
     while IFS='|' read -r name version depends notes; do
         [[ -z "$name" || "$name" =~ ^# ]] && continue
         echo "$name|$version|$depends"
     done < "$CONFIG_FILE"
 }
 
-# Get single package info
 get_package_info() {
     local pkgname="$1"
-    
     while IFS='|' read -r name version depends notes; do
         [[ "$name" == "$pkgname" ]] && {
             echo "$name|$version|$depends|$notes"
@@ -44,7 +46,6 @@ get_package_info() {
     return 1
 }
 
-# Resolve build order (simple topological sort)
 get_build_order() {
     local -A pkg_deps
     local -a pkg_names
@@ -64,7 +65,6 @@ get_build_order() {
         
         for name in "${pkg_names[@]}"; do
             [[ " ${order[*]} " =~ " $name " ]] && continue
-            
             local deps="${pkg_deps[$name]}"
             local satisfied=1
             
@@ -91,34 +91,28 @@ get_build_order() {
     printf '%s\n' "${order[@]}"
 }
 
-# Find package directory
 find_pkgdir() {
     local pkgname="$1"
-    
     for dir in "$PROJECT_ROOT/packages/$pkgname" "$PROJECT_ROOT/packages/dependencies/$pkgname"; do
         [ -d "$dir" ] && { echo "$dir"; return 0; }
     done
     return 1
 }
 
-# Check if package is already built and valid
 check_package_valid() {
     local pkgname="$1"
     local pkgver="$2"
     
-    # Check for package file (with version prefix matching)
+    # Use ls with full path
     local pkgfile=$(ls "$REPO_DIR/${pkgname}-${pkgver}"*-x86_64.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
     
     if [ -z "$pkgfile" ]; then
         return 1
     fi
     
-    # Check for signature file
     if [ ! -f "${pkgfile}.sig" ]; then
         return 1
     fi
     
-    # Package exists with signature - consider it valid
-    # (Signature verification is done separately in sign step)
     return 0
 }
