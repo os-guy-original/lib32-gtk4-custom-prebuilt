@@ -147,6 +147,7 @@ jobs:
           lib32-wayland \
           lib32-dbus \
           lib32-json-glib \
+          lib32-readline \
           graphene \
           gtk4 \
           tinysparql \

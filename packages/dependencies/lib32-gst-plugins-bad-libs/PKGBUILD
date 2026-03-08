@@ -51,6 +51,7 @@ build() {
     -D glib-asserts=disabled
     -D glib-checks=disabled
     -D opencv=disabled
+    -D va=disabled
     -D package-name="Arch Linux ${pkgname} ${pkgver}-${pkgrel}"
     -D package-origin='https://www.archlinux.org/'
   )
