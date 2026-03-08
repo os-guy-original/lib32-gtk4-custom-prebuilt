@@ -64,7 +64,24 @@ jobs:
         echo "::endgroup::"
         
         echo "::group::Installing build dependencies"
-        pacman -S --noconfirm --needed base-devel git multilib-devel sudo
+        pacman -S --noconfirm --needed \
+          base-devel \
+          git \
+          multilib-devel \
+          sudo \
+          meson \
+          ninja \
+          pkgconf \
+          cmake \
+          autoconf \
+          automake \
+          libtool \
+          gettext \
+          glib2-devel \
+          python \
+          python-docutils \
+          gtk-doc \
+          gobject-introspection
         echo "::endgroup::"
 
     - name: Checkout repository
