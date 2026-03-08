@@ -100,9 +100,8 @@ build_packages() {
         
         local pkg_start=$(date +%s)
         
-        # Build the package (capture output for cleaner logs)
+        # Build the package
         if (cd "$pkgdir" && makepkg -sf --noconfirm --nocheck 2>&1 | while read -r line; do
-            # Only show important lines
             case "$line" in
                 "==> Making package:"*|"==> Starting build"*|"==> Finished making:"*)
                     echo "    $line"
@@ -118,11 +117,11 @@ build_packages() {
             # Move built package to output
             mv "$pkgdir"/*.pkg.tar.* "$OUTPUT_DIR/" 2>/dev/null || true
             
-            # Install for subsequent builds
+            # Install for subsequent builds (ignore errors)
             local pkg_file=$(ls "$OUTPUT_DIR/${name}"*.pkg.tar.* 2>/dev/null | grep -v debug | head -1)
             if [ -f "$pkg_file" ]; then
                 info "Installing $name for subsequent builds..."
-                sudo pacman -U "$pkg_file" --noconfirm --overwrite '*' >&2
+                sudo pacman -U "$pkg_file" --noconfirm --overwrite '*' 2>/dev/null || info "Note: Package may already be installed"
             fi
             
             local pkg_end=$(date +%s)

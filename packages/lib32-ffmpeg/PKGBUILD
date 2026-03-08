@@ -5,7 +5,7 @@ _pkgname=ffmpeg
 pkgname=lib32-$_pkgname
 pkgver=8.0.1
 pkgrel=1
-pkgdesc='Complete solution to record, convert and stream audio and video (32-bit)'
+pkgdesc='Complete solution to record, convert and stream audio and video (32-bit) - minimal build'
 arch=('x86_64')
 url='https://ffmpeg.org/'
 license=('GPL3')
@@ -24,22 +24,12 @@ depends=(
     'lib32-libxcb'
     'lib32-libxext'
     'lib32-libxv'
-    'lib32-libvdpau'
-    'lib32-libva'
     'lib32-sdl2'
-    'lib32-v4l-utils'
-    'lib32-libvorbis'
-    'lib32-opus'
-    'lib32-libtheora'
-    'lib32-libvpx'
-    'lib32-speex'
-    'lib32-libwebp'
+    'lib32-libva'
+    'lib32-libvdpau'
     'lib32-freetype2'
     'lib32-fontconfig'
     'lib32-fribidi'
-    'lib32-harfbuzz'
-    'lib32-libass'
-    'lib32-libssh'
     'ffmpeg'
 )
 makedepends=(
@@ -92,15 +82,18 @@ build() {
         --disable-vapoursynth \
         --disable-libx264 \
         --disable-libx265 \
-        --enable-libvpx \
-        --enable-libaom \
-        --enable-libdav1d \
-        --enable-libopus \
-        --enable-libvorbis \
+        --disable-libvpx \
+        --disable-libaom \
+        --disable-libdav1d \
+        --disable-libopus \
+        --disable-libvorbis \
         --disable-libmp3lame \
-        --enable-libtheora \
-        --enable-libwebp \
-        --enable-libass
+        --disable-libtheora \
+        --disable-libwebp \
+        --disable-libass \
+        --disable-libfreetype \
+        --disable-libfontconfig \
+        --disable-libfribidi
 
     make
 }

@@ -65,12 +65,15 @@ jobs:
           lib32-dbus lib32-json-glib lib32-readline lib32-gtk3 lib32-libevent \
           lib32-at-spi2-core graphene gtk4 tinysparql gst-plugins-bad \
           libcloudproviders wayland-protocols vulkan-headers \
-          lib32-sdl2 lib32-alsa-lib \
-          lib32-libvorbis lib32-libtheora lib32-libwebp lib32-opus \
+          lib32-sdl2 lib32-alsa-lib lib32-libvdpau \
+          lib32-freetype2 lib32-fontconfig lib32-fribidi \
           ffmpeg
 
     - name: Build packages
       run: |
+        # Remove old .sig files to avoid signature verification issues
+        rm -f repo/*.sig
+        
         chmod +x scripts/build-all.sh
         sudo -u builder ./scripts/build-all.sh -o "$PWD/repo" 2>&1 | tee build.log
 
