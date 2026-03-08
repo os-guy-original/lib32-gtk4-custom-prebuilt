@@ -85,6 +85,67 @@ All 7 packages built successfully:
 
 The build is working!
 
+## Build Progress (Latest Updates)
+
+Since the initial build completion, significant work has been done to improve the workflow and fix issues:
+
+### Workflow Fixes Applied:
+- **Git safe.directory configuration** — Added to prevent "detected dubious ownership" errors in CI environment when running git commands inside the container
+- **repo-add -R flag** — Added the `-R` flag to repo-add command to remove old package files from the database before adding new ones, preventing database corruption from stale entries
+- **Feature detection script** — Now fully functional, automatically detects and reports missing features in the built lib32-gtk4 package compared to the 64-bit version
+
+### Repo Database Creation:
+- Currently being fixed — Working on resolving symlink issues in the repository database generation
+- The workflow now properly generates a pacman-compatible repository database
+
+## Known Issues
+
+The following issues are currently known and documented:
+
+### lib32-gst-plugins-bad-libs
+- **Status**: Skipped entirely
+- **Reason**: Too many build issues related to cuda, amf, and vulkan dependencies that don't have proper 32-bit support
+- **Workaround**: Using system package from multilib repository instead
+- **Impact**: Reduced gstreamer plugin functionality, but core GTK4 works
+
+### lib32-gtk4 media-gstreamer
+- **Status**: Disabled
+- **Reason**: No 32-bit gstreamer-player package available
+- **Impact**: GTK4 media playback via gstreamer backend is unavailable in 32-bit
+- **Workaround**: Applications can use other media backends if available
+
+### Repository Database Symlink Issue
+- **Status**: Being fixed
+- **Reason**: Symlink handling in repo-add/repo-remove commands during database generation
+- **Impact**: May cause issues with pacman database consistency
+- **Current Progress**: Workflow updated with -R flag and proper path handling
+
+## Total Commits
+
+**Approximately 30+ commits** were made to achieve a working build. This includes:
+- Initial repository setup and structure
+- Multiple PKGBUILD iterations and fixes
+- Workflow configuration refinements
+- Dependency resolution updates
+- Bug fixes and error corrections
+- Documentation updates
+
+The commit history demonstrates the iterative nature of getting a complex multilib build working correctly on Arch Linux.
+
+## Time Invested
+
+This project required **several hours of iterative debugging** spread across multiple sessions. The work included:
+
+- Initial repository structure creation
+- Identifying and resolving dependency chains
+- Debugging meson build configurations
+- Fixing GitHub Actions workflow issues
+- Testing and validating builds
+- Analyzing build logs and error messages
+- Implementing workarounds for unavailable 32-bit libraries
+
+The time investment reflects the complexity of building 32-bit packages on a 64-bit Arch Linux system where many dependencies don't have official multilib support.
+
 ## 4. How to Work on This Repository
 
 ### 4.1 Monitoring Build Status
